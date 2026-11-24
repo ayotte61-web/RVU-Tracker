@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Primary Care wRVU Tracker &amp; Audit — 2026 CMS MPFS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Top Navigation -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+          <i data-lucide="activity" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-slate-900 truncate">Primary Care wRVU Tracker</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">2026 CMS MPFS</span>
+          </div>
+          <p class="text-xs text-slate-500 truncate">Outpatient clinic log &amp; health system RVU reconciliation</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btnOpenCustomCode" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-teal-600"></i>
+          <span class="hidden md:inline">Custom Code</span>
+        </button>
+        <button id="btnOpenImport" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+          <i data-lucide="upload" class="w-3.5 h-3.5 text-slate-600"></i>
+          <span class="hidden sm:inline">Import CSV</span>
+        </button>
+        <button id="btnExportCsv" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+          <i data-lucide="download" class="w-3.5 h-3.5 text-slate-600"></i>
+          <span class="hidden sm:inline">Export CSV</span>
+        </button>
+        <button id="btnOpenSettings" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition">
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Targets &amp; Rate</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100 flex items-center gap-1 overflow-x-auto">
+      <button type="button" data-tab="tracker" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-teal-600 text-teal-700 whitespace-nowrap">
+        Tracker &amp; Audit Log
+      </button>
+      <button type="button" data-tab="analytics" class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+        Analytics &amp; Coding Mix
+      </button>
+      <button type="button" data-tab="reference" class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 whitespace-nowrap">
+        2026 CPT Reference (<span id="refCountBadge">59</span>)
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- KPI Summary Strip -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-500">
+          <span>Filtered CMS wRVUs</span>
+          <i data-lucide="bar-chart-2" class="w-4 h-4 text-teal-600"></i>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiTotalWrvu" class="text-2xl font-bold text-slate-900 tabular-nums">0.00</span>
+          <span id="kpiEstComp" class="text-xs font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full tabular-nums">$0 est.</span>
+        </div>
+        <div class="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div id="kpiAnnualProgress" class="bg-teal-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="kpiAnnualLabel" class="mt-1.5 text-xs text-slate-500 tabular-nums">0.0% of 4,800 annual target</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-500">
+          <span>Today's Production</span>
+          <i data-lucide="calendar-check" class="w-4 h-4 text-indigo-600"></i>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiTodayWrvu" class="text-2xl font-bold text-slate-900 tabular-nums">0.00</span>
+          <span id="kpiTodayVisits" class="text-xs text-slate-500 tabular-nums">0 visits</span>
+        </div>
+        <div class="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div id="kpiDailyProgress" class="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <p id="kpiDailyLabel" class="mt-1.5 text-xs text-slate-500 tabular-nums">Target: 22.00 wRVU/day</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-500">
+          <span>Avg wRVU / Encounter</span>
+          <i data-lucide="trending-up" class="w-4 h-4 text-amber-600"></i>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiAvgWrvu" class="text-2xl font-bold text-slate-900 tabular-nums">0.00</span>
+          <span id="kpiTotalVisits" class="text-xs text-slate-500 tabular-nums">0 total visits</span>
+        </div>
+        <p id="kpiLevel4Rate" class="mt-3 text-xs text-slate-500 tabular-nums">99214+ share: 0% of est. E/M</p>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between text-xs font-medium text-slate-500">
+          <span>System Audit Variance</span>
+          <i data-lucide="shield-alert" class="w-4 h-4 text-rose-600"></i>
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="kpiVariance" class="text-2xl font-bold text-slate-900 tabular-nums">0.00</span>
+          <span id="kpiDiscrepancyCount" class="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">0 flagged</span>
+        </div>
+        <p id="kpiVarianceNote" class="mt-3 text-xs text-slate-500">Enter weekly health system wRVUs to audit</p>
+      </div>
+    </section>
+
+    <!-- VIEW 1: TRACKER & AUDIT LOG -->
+    <section id="view-tracker" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Quick-Log Encounter Builder -->
+        <div class="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900">Log Patient Encounter</h2>
+            <span class="text-xs font-medium text-slate-500">Multi-code supported</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="inputDate" class="block text-xs font-medium text-slate-700 mb-1">Service Date</label>
+              <input id="inputDate" type="date" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            </div>
+            <div>
+              <label for="inputNote" class="block text-xs font-medium text-slate-700 mb-1">Visit Label (no PHI)</label>
+              <input id="inputNote" type="text" placeholder="e.g. HTN/DM2 f/u, Post-CHF TCM" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            </div>
+          </div>
+
+          <!-- Quick-Add Common Chips -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-medium text-slate-700">Quick-Add Common Codes</span>
+              <span class="text-[11px] text-slate-400">Click to stage</span>
+            </div>
+            <div id="quickChips" class="space-y-2"></div>
+          </div>
+
+          <!-- Searchable Code Selector -->
+          <div>
+            <label for="codeSearchSelect" class="block text-xs font-medium text-slate-700 mb-1">All Primary Care Codes</label>
+            <div class="flex gap-2">
+              <select id="codeSearchSelect" class="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"></select>
+              <button id="btnAddSelectedCode" type="button" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition shrink-0">
+                Add
+              </button>
+            </div>
+          </div>
+
+          <!-- Staged Codes Cart -->
+          <div class="border border-slate-200 rounded-lg bg-slate-50 p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">Staged Codes</span>
+              <span id="draftTotalBadge" class="text-sm font-bold text-teal-700 tabular-nums">0.00 wRVU</span>
+            </div>
+            <div id="draftList" class="space-y-2">
+              <p class="text-xs text-slate-400 py-2 text-center">No codes staged yet. Click a quick chip or select a code above.</p>
+            </div>
+          </div>
+
+          <button id="btnLogEncounter" type="button" class="w-full py-2.5 px-4 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition shadow-sm flex items-center justify-center gap-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            <span>Log Encounter</span>
+          </button>
+        </div>
+
+        <!-- Right Column: Weekly Health System Audit + Encounter Log -->
+        <div class="lg:col-span-7 space-y-6">
+          <!-- Weekly Health System Reconciliation -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Weekly Health System Reconciliation</h2>
+                <p class="text-xs text-slate-500">Enter your health system's weekly wRVU total (Mon–Sun) to check for discrepancies</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="btnLoadSample" type="button" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition">
+                  Load Sample Week
+                </button>
+                <button id="btnClearAll" type="button" class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white text-rose-600 border border-slate-200 hover:bg-rose-50 transition">
+                  Clear Log
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <th class="py-2.5 px-3">Week (Mon–Sun)</th>
+                    <th class="py-2.5 px-3 text-right">Visits</th>
+                    <th class="py-2.5 px-3 text-right">CMS wRVU</th>
+                    <th class="py-2.5 px-3 text-right">System Weekly wRVU</th>
+                    <th class="py-2.5 px-3 text-right">Variance</th>
+                    <th class="py-2.5 px-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="weeklyAuditBody" class="divide-y divide-slate-100 text-sm"></tbody>
+              </table>
+            </div>
+            <div id="emptyWeeklyState" class="p-5 text-center text-xs text-slate-500 hidden">
+              Log visits or click <strong>Load Sample Week</strong> to start weekly reconciliation.
+            </div>
+          </div>
+
+          <!-- Encounter Log -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-200 space-y-3">
+              <div class="flex items-center justify-between">
+                <h2 class="text-base font-bold text-slate-900">Encounter Log</h2>
+                <span id="encounterCountBadge" class="text-xs font-medium text-slate-500 tabular-nums">0 visits</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <select id="filterRange" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+                  <option value="all">All Dates</option>
+                  <option value="today">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">This Month</option>
+                </select>
+                <select id="filterStatus" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-teal-500">
+                  <option value="all">All Weekly Audit Statuses</option>
+                  <option value="discrepancy">Discrepancy Weeks</option>
+                  <option value="matched">Matched Weeks</option>
+                  <option value="pending">Pending Weeks</option>
+                </select>
+                <input id="filterSearch" type="text" placeholder="Filter by code or note..." class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <th class="py-2.5 px-3">Date / Note</th>
+                    <th class="py-2.5 px-3">CPT Codes</th>
+                    <th class="py-2.5 px-3 text-right">CMS wRVU</th>
+                    <th class="py-2.5 px-3 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody id="encounterTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+              </table>
+            </div>
+            <div id="emptyLogState" class="p-8 text-center space-y-2 hidden">
+              <p class="text-sm font-medium text-slate-700">No encounters logged for this filter.</p>
+              <p class="text-xs text-slate-500">Log a visit on the left, import a CSV, or click <strong>Load Sample Week</strong> to test the audit workflow.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: ANALYTICS & CODING MIX -->
+    <section id="view-analytics" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Daily wRVU Production vs. Target</h3>
+              <p class="text-xs text-slate-500">CMS 2026 expected wRVUs by service date</p>
+            </div>
+          </div>
+          <div class="relative h-72">
+            <canvas id="dailyChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">wRVU Share by Service Category</h3>
+              <p class="text-xs text-slate-500">E/M visits, preventive, care management, and procedures</p>
+            </div>
+          </div>
+          <div class="relative h-72">
+            <canvas id="categoryChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900 mb-3">Primary Care Coding &amp; Capture Insights</h3>
+        <div id="analyticsInsights" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm"></div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: 2026 CPT REFERENCE -->
+    <section id="view-reference" class="hidden space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">2026 Primary Care CPT &amp; HCPCS Reference</h2>
+            <p class="text-xs text-slate-500">Work RVUs per 2026 CMS Medicare Physician Fee Schedule. Note: CMS transitions G2211 to modifier B1 on Jan 1, 2027.</p>
+          </div>
+          <input id="refSearch" type="text" placeholder="Search code, description, or rule..." class="w-full sm:w-72 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+
+        <div id="refCategoryPills" class="flex flex-wrap gap-1.5"></div>
+
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <th class="py-2.5 px-3">Code</th>
+                <th class="py-2.5 px-3">Category</th>
+                <th class="py-2.5 px-3">Service Description</th>
+                <th class="py-2.5 px-3 text-right">2026 wRVU</th>
+                <th class="py-2.5 px-3">Key Documentation Requirement</th>
+                <th class="py-2.5 px-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="refTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings Modal -->
+  <div id="modalSettings" class="fixed inset-0 z-40 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">Targets &amp; Compensation Rate</h3>
+        <button type="button" class="close-modal text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label for="settingRate" class="block text-xs font-medium text-slate-700 mb-1">Contractual $/wRVU Rate ($)</label>
+          <input id="settingRate" type="number" step="0.50" min="0" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums" />
+        </div>
+        <div>
+          <label for="settingDailyTarget" class="block text-xs font-medium text-slate-700 mb-1">Daily wRVU Target</label>
+          <input id="settingDailyTarget" type="number" step="0.5" min="1" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums" />
+        </div>
+        <div>
+          <label for="settingAnnualTarget" class="block text-xs font-medium text-slate-700 mb-1">Annual wRVU Target (MGMA Primary Care Median ~4,800)</label>
+          <input id="settingAnnualTarget" type="number" step="50" min="100" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="close-modal px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button id="btnSaveSettings" type="button" class="px-4 py-2 text-sm font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-700">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Code Modal -->
+  <div id="modalCustomCode" class="fixed inset-0 z-40 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">Add Custom CPT / HCPCS Code</h3>
+        <button type="button" class="close-modal text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="customCodeId" class="block text-xs font-medium text-slate-700 mb-1">CPT / HCPCS Code</label>
+            <input id="customCodeId" type="text" placeholder="e.g. 99401" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase" />
+          </div>
+          <div>
+            <label for="customCodeWrvu" class="block text-xs font-medium text-slate-700 mb-1">wRVU Value</label>
+            <input id="customCodeWrvu" type="number" step="0.01" min="0" placeholder="0.48" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tabular-nums" />
+          </div>
+        </div>
+        <div>
+          <label for="customCodeDesc" class="block text-xs font-medium text-slate-700 mb-1">Description</label>
+          <input id="customCodeDesc" type="text" placeholder="Brief service description" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label for="customCodeCat" class="block text-xs font-medium text-slate-700 mb-1">Category</label>
+          <select id="customCodeCat" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white">
+            <option value="Procedures & Diagnostics">Procedures &amp; Diagnostics</option>
+            <option value="Office E/M - Est">Office E/M - Est</option>
+            <option value="Office E/M - New">Office E/M - New</option>
+            <option value="Preventive">Preventive</option>
+            <option value="Care Mgmt & Add-Ons">Care Mgmt &amp; Add-Ons</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" class="close-modal px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button id="btnSaveCustomCode" type="button" class="px-4 py-2 text-sm font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-700">Add Code</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import CSV Modal -->
+  <div id="modalImport" class="fixed inset-0 z-40 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-lg w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">Import Encounters CSV</h3>
+        <button type="button" class="close-modal text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <p class="text-xs text-slate-600">
+        Paste CSV rows or upload a file with columns: <code class="bg-slate-100 px-1 rounded">Date,Codes,Note</code><br />
+        Separate multiple codes in one visit with <code class="bg-slate-100 px-1 rounded">+</code> or <code class="bg-slate-100 px-1 rounded">;</code> (e.g. <code class="bg-slate-100 px-1 rounded">2026-11-24,99214+G2211,HTN f/u</code>).
+      </p>
+      <input id="importFileInput" type="file" accept=".csv,.txt" class="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100" />
+      <textarea id="importCsvText" rows="5" placeholder="2026-11-24,99214+G2211,HTN + DM2 follow-up&#10;2026-11-24,G0439+99214,AWV + separate acute complaint" class="w-full rounded-lg border border-slate-300 p-2.5 text-xs font-mono"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="close-modal px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button id="btnRunImport" type="button" class="px-4 py-2 text-sm font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-700">Import Rows</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Clear Modal -->
+  <div id="modalConfirmClear" class="fixed inset-0 z-40 bg-slate-900/50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-sm w-full p-5 space-y-4 shadow-xl">
+      <h3 class="text-base font-bold text-slate-900">Clear All Logged Encounters?</h3>
+      <p class="text-xs text-slate-600">This will remove all encounters from your local browser log. Export a CSV first if you want a backup.</p>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="close-modal px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+        <button id="btnConfirmClear" type="button" class="px-4 py-2 text-sm font-semibold bg-rose-600 text-white rounded-lg hover:bg-rose-700">Clear Log</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Verified 2026 CMS Medicare Physician Fee Schedule (MPFS) Primary Care wRVUs
+    const DEFAULT_CPT_CATALOG = [
+      // Established Office E/M
+      { code: '99211', category: 'Office E/M - Est', desc: 'Established patient, minimal / nurse visit', wrvu: 0.18, req: 'Staff/nurse visit under general supervision; plan of care initiated' },
+      { code: '99212', category: 'Office E/M - Est', desc: 'Established patient, straightforward MDM (10-19 min)', wrvu: 0.70, req: '1 self-limited/minor problem or 10+ min total time' },
+      { code: '99213', category: 'Office E/M - Est', desc: 'Established patient, low MDM (20-29 min)', wrvu: 1.30, req: '1 stable chronic or acute uncomplicated problem, or 20+ min' },
+      { code: '99214', category: 'Office E/M - Est', desc: 'Established patient, moderate MDM (30-39 min)', wrvu: 1.92, req: '2+ stable chronic conditions, 1 worsening, or Rx management; or 30+ min' },
+      { code: '99215', category: 'Office E/M - Est', desc: 'Established patient, high MDM (40-54 min)', wrvu: 2.80, req: 'Severe exacerbation / intensive drug monitoring / hospitalization risk; or 40+ min' },
+
+      // New Patient Office E/M
+      { code: '99202', category: 'Office E/M - New', desc: 'New patient, straightforward MDM (15-29 min)', wrvu: 0.93, req: 'New patient (3-yr rule), straightforward MDM or 15+ min' },
+      { code: '99203', category: 'Office E/M - New', desc: 'New patient, low MDM (30-44 min)', wrvu: 1.60, req: 'New patient, low MDM or 30+ min' },
+      { code: '99204', category: 'Office E/M - New', desc: 'New patient, moderate MDM (45-59 min)', wrvu: 2.60, req: 'New patient, moderate MDM (2+ chronic or Rx mgmt) or 45+ min' },
+      { code: '99205', category: 'Office E/M - New', desc: 'New patient, high MDM (60-74 min)', wrvu: 3.50, req: 'New patient, high MDM or 60+ min' },
+
+      // Preventive Medicine
+      { code: '99381', category: 'Preventive', desc: 'Preventive visit, new patient, infant (<1 yr)', wrvu: 1.50, req: 'Comprehensive age-appropriate preventive exam, new patient' },
+      { code: '99382', category: 'Preventive', desc: 'Preventive visit, new patient, ages 1-4', wrvu: 1.60, req: 'Comprehensive preventive exam, new patient ages 1-4' },
+      { code: '99383', category: 'Preventive', desc: 'Preventive visit, new patient, ages 5-11', wrvu: 1.70, req: 'Comprehensive preventive exam, new patient ages 5-11' },
+      { code: '99385', category: 'Preventive', desc: 'Preventive visit, new patient, ages 18-39', wrvu: 1.92, req: 'Comprehensive preventive exam, commercial/non-Medicare adult' },
+      { code: '99386', category: 'Preventive', desc: 'Preventive visit, new patient, ages 40-64', wrvu: 2.33, req: 'Comprehensive preventive exam, new adult 40-64' },
+      { code: '99387', category: 'Preventive', desc: 'Preventive visit, new patient, ages 65+', wrvu: 2.50, req: 'Comprehensive preventive exam, new adult 65+ (commercial)' },
+      { code: '99391', category: 'Preventive', desc: 'Preventive visit, established, infant (<1 yr)', wrvu: 1.37, req: 'Comprehensive preventive exam, established infant' },
+      { code: '99392', category: 'Preventive', desc: 'Preventive visit, established, ages 1-4', wrvu: 1.50, req: 'Comprehensive preventive exam, established child 1-4 yrs' },
+      { code: '99393', category: 'Preventive', desc: 'Preventive visit, established, ages 5-11', wrvu: 1.50, req: 'Comprehensive preventive exam, established child 5-11 yrs' },
+      { code: '99394', category: 'Preventive', desc: 'Preventive visit, established, ages 12-17', wrvu: 1.70, req: 'Comprehensive preventive exam, established adolescent 12-17 yrs' },
+      { code: '99395', category: 'Preventive', desc: 'Preventive visit, established, ages 18-39', wrvu: 1.75, req: 'Comprehensive preventive exam, established adult 18-39' },
+      { code: '99396', category: 'Preventive', desc: 'Preventive visit, established, ages 40-64', wrvu: 1.90, req: 'Comprehensive preventive exam, established adult 40-64' },
+      { code: '99397', category: 'Preventive', desc: 'Preventive visit, established, ages 65+', wrvu: 2.00, req: 'Comprehensive preventive exam, established adult 65+ (commercial)' },
+
+      // Medicare Wellness & Preventive Screenings
+      { code: 'G0402', category: 'Medicare Wellness', desc: 'Welcome to Medicare (IPPE), first 12 mos Part B', wrvu: 2.60, req: 'Once per lifetime within first 12 months of Medicare Part B' },
+      { code: 'G0438', category: 'Medicare Wellness', desc: 'Initial Medicare Annual Wellness Visit (AWV)', wrvu: 2.60, req: 'All required AWV HRA/safety/prevention components; once per lifetime' },
+      { code: 'G0439', category: 'Medicare Wellness', desc: 'Subsequent Medicare Annual Wellness Visit (AWV)', wrvu: 1.92, req: 'Updated health risk assessment & prevention plan annually' },
+      { code: 'G0101', category: 'Medicare Wellness', desc: 'Cervical/vaginal cancer screening; pelvic & breast exam', wrvu: 0.45, req: 'Medicare screening pelvic & clinical breast exam' },
+      { code: 'G0442', category: 'Medicare Wellness', desc: 'Annual alcohol misuse screening (15 min)', wrvu: 0.18, req: 'Annual validated screening instrument documented' },
+      { code: 'G0444', category: 'Medicare Wellness', desc: 'Annual depression screening in primary care', wrvu: 0.18, req: 'Annual validated screening tool (e.g., PHQ-2/PHQ-9) documented' },
+      { code: 'G0446', category: 'Medicare Wellness', desc: 'Intensive behavioral therapy for CVD risk', wrvu: 0.60, req: 'Annual face-to-face CVD risk reduction counseling' },
+      { code: 'G0443', category: 'Medicare Wellness', desc: 'Brief behavioral counseling for alcohol misuse (15 min)', wrvu: 0.60, req: 'Positive G0442 screen on file; up to 4 sessions per 12 mos' },
+      { code: 'G0447', category: 'Medicare Wellness', desc: 'Face-to-face behavioral counseling for obesity (15 min)', wrvu: 0.60, req: 'BMI >= 30 documented + 15 min intensive behavioral counseling' },
+      { code: 'G0537', category: 'Medicare Wellness', desc: 'Standardized ASCVD risk assessment (5-15 min)', wrvu: 0.18, req: 'No prior ASCVD; >=1 risk factor + lipid panel <=12 mos; once/yr' },
+      { code: 'G0296', category: 'Medicare Wellness', desc: 'Lung cancer screening LDCT counseling & shared decision-making', wrvu: 0.52, req: 'Age 50-77, >=20 pack-yrs, decision aid named, prior to 1st LDCT' },
+
+      // Care Management, Counseling & Add-Ons
+      { code: 'G2211', category: 'Care Mgmt & Add-Ons', desc: 'Visit complexity add-on (longitudinal primary care)', wrvu: 0.33, req: 'Continuing focal point of care w/ office E/M (transitions to Mod B1 in 2027)' },
+      { code: 'G2212', category: 'Care Mgmt & Add-Ons', desc: 'Prolonged outpatient E/M (Medicare, +15 min)', wrvu: 0.61, req: 'Time-based 99205/99215 plus full 15 min beyond max threshold' },
+      { code: '99417', category: 'Care Mgmt & Add-Ons', desc: 'Prolonged outpatient E/M (Commercial/AMA, +15 min)', wrvu: 0.61, req: 'Time-based 99205/99215 plus 15 min beyond threshold (non-Medicare)' },
+      { code: '99495', category: 'Care Mgmt & Add-Ons', desc: 'Transitional Care Mgmt (TCM), moderate (visit <=14d)', wrvu: 2.78, req: 'Contact within 2 business days of discharge + visit <=14d + med rec' },
+      { code: '99496', category: 'Care Mgmt & Add-Ons', desc: 'Transitional Care Mgmt (TCM), high (visit <=7d)', wrvu: 3.79, req: 'Contact within 2 business days + visit <=7d + high MDM + med rec' },
+      { code: '99490', category: 'Care Mgmt & Add-Ons', desc: 'Chronic Care Mgmt (CCM), clinical staff (20 min/mo)', wrvu: 1.00, req: '2+ chronic conditions, 20 min/mo non-face-to-face + consent' },
+      { code: '99491', category: 'Care Mgmt & Add-Ons', desc: 'Chronic Care Mgmt (CCM), physician/QHP (30 min/mo)', wrvu: 1.50, req: '2+ chronic conditions, 30 min/mo personally performed + consent' },
+      { code: '99497', category: 'Care Mgmt & Add-Ons', desc: 'Advance Care Planning (ACP), first 30 min', wrvu: 1.50, req: 'Voluntary advance directives discussion, >=16 min documented' },
+      { code: '99498', category: 'Care Mgmt & Add-Ons', desc: 'Advance Care Planning (ACP), each addl 30 min', wrvu: 1.40, req: 'Each additional 30 min of ACP beyond initial 30 min' },
+      { code: '99406', category: 'Care Mgmt & Add-Ons', desc: 'Smoking/tobacco cessation counseling (3-10 min)', wrvu: 0.24, req: 'Counseling time documented (3-10 min)' },
+      { code: '99407', category: 'Care Mgmt & Add-Ons', desc: 'Smoking/tobacco cessation counseling (>10 min)', wrvu: 0.50, req: 'Counseling time documented (>10 min)' },
+
+      // In-Office Procedures, Diagnostics & Immunizations
+      { code: '93000', category: 'Procedures & Diagnostics', desc: 'Electrocardiogram (EKG), complete w/ interpretation', wrvu: 0.17, req: '12-lead ECG tracing + written physician interpretation' },
+      { code: '69210', category: 'Procedures & Diagnostics', desc: 'Impacted cerumen removal, instrumentation', wrvu: 0.59, req: 'Impacted cerumen + instrumentation (not simple lavage); unilateral' },
+      { code: '20610', category: 'Procedures & Diagnostics', desc: 'Major joint/bursa aspiration or injection (no US)', wrvu: 0.77, req: 'Site, prep, medication/volume, and tolerance documented' },
+      { code: '20611', category: 'Procedures & Diagnostics', desc: 'Major joint/bursa injection, ultrasound-guided', wrvu: 1.07, req: 'Ultrasound guidance + permanent image stored + procedure note' },
+      { code: '17000', category: 'Procedures & Diagnostics', desc: 'Destruction of premalignant lesion (1st lesion)', wrvu: 0.59, req: 'Site, method (e.g. cryotherapy), and lesion count documented' },
+      { code: '17110', category: 'Procedures & Diagnostics', desc: 'Destruction of benign lesions (up to 14)', wrvu: 0.68, req: 'Method and exact number of lesions (1-14) documented' },
+      { code: '11102', category: 'Procedures & Diagnostics', desc: 'Tangential skin biopsy, single lesion', wrvu: 0.64, req: 'Lesion site, shave/tangential technique, pathology sent' },
+      { code: '12001', category: 'Procedures & Diagnostics', desc: 'Simple laceration repair (<=2.5 cm)', wrvu: 0.82, req: 'Length (<=2.5 cm), anatomical site, and closure method' },
+      { code: '10060', category: 'Procedures & Diagnostics', desc: 'Incision & drainage (I&D) of simple abscess', wrvu: 1.19, req: 'Location, incision, drainage, and wound care documented' },
+      { code: '96372', category: 'Procedures & Diagnostics', desc: 'Therapeutic/prophylactic/diagnostic injection (IM/SC)', wrvu: 0.17, req: 'Drug, dose, route, site documented (not for vaccines)' },
+      { code: '90460', category: 'Procedures & Diagnostics', desc: 'Immunization admin w/ counseling, 1st component', wrvu: 0.23, req: 'Physician/QHP vaccine counseling documented (pediatric <=18)' },
+      { code: '90461', category: 'Procedures & Diagnostics', desc: 'Immunization admin w/ counseling, addl component', wrvu: 0.18, req: 'Each additional vaccine component w/ documented counseling' },
+      { code: '90471', category: 'Procedures & Diagnostics', desc: 'Immunization admin (adult/no counseling), 1st vaccine', wrvu: 0.17, req: 'First percutaneous/IM/SC vaccine administered' },
+      { code: '90472', category: 'Procedures & Diagnostics', desc: 'Immunization admin, each additional vaccine', wrvu: 0.15, req: 'Each additional vaccine administered on same date' },
+      { code: '96127', category: 'Procedures & Diagnostics', desc: 'Brief emotional/behavioral assessment (PHQ-9/GAD-7)', wrvu: 0.00, req: 'PE-only code (0.00 wRVU / 0.15 Total RVU); standardized score documented' }
+    ];
+
+    const QUICK_CHIP_GROUPS = [
+      { label: 'Office E/M', badge: 'bg-teal-50/70 hover:bg-teal-100 border-teal-200 text-teal-950', codes: ['99213', '99214', '99215'] },
+      { label: 'Preventive & AWV', badge: 'bg-indigo-50/70 hover:bg-indigo-100 border-indigo-200 text-indigo-950', codes: ['99391', '99392', '99393', '99394', '99395', '99396', '99397', 'G0439'] },
+      { label: 'TCM & ACP', badge: 'bg-amber-50/70 hover:bg-amber-100 border-amber-200 text-amber-950', codes: ['99495', '99496', '99497'] },
+      { label: 'G-Codes & Counseling', badge: 'bg-slate-100 hover:bg-teal-50 border-slate-200 hover:border-teal-300 text-slate-900', codes: ['G2211', '99406', 'G0442', 'G0443', 'G0444', 'G0446', 'G0447', 'G0537', 'G0296'] }
+    ];
+
+    const STORAGE_KEY_ENCOUNTERS = 'pc_wrvu_encounters_v1';
+    const STORAGE_KEY_WEEKLY = 'pc_wrvu_weekly_reports_v1';
+    const STORAGE_KEY_SETTINGS = 'pc_wrvu_settings_v1';
+    const STORAGE_KEY_CUSTOM = 'pc_wrvu_custom_codes_v1';
+
+    const TODAY_STR = new Date().toISOString().slice(0, 10);
+
+    let state = {
+      catalog: [...DEFAULT_CPT_CATALOG],
+      encounters: [],
+      weeklyReports: {},
+      draftItems: [],
+      settings: { ratePerWrvu: 52.00, dailyTarget: 22.0, annualTarget: 4800 },
+      filters: { dateRange: 'all', status: 'all', search: '' },
+      refFilter: { category: 'All', search: '' },
+      activeTab: 'tracker'
+    };
+
+    let dailyChartInstance = null;
+    let categoryChartInstance = null;
+
+    function loadState() {
+      try {
+        const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
+        if (savedSettings) state.settings = { ...state.settings, ...JSON.parse(savedSettings) };
+        const savedCustom = localStorage.getItem(STORAGE_KEY_CUSTOM);
+        if (savedCustom) {
+          const customList = JSON.parse(savedCustom);
+          customList.forEach(c => {
+            if (!state.catalog.some(x => x.code === c.code)) state.catalog.push(c);
+          });
+        }
+        const savedEnc = localStorage.getItem(STORAGE_KEY_ENCOUNTERS);
+        if (savedEnc) state.encounters = JSON.parse(savedEnc);
+        const savedWeekly = localStorage.getItem(STORAGE_KEY_WEEKLY);
+        if (savedWeekly) state.weeklyReports = JSON.parse(savedWeekly);
+      } catch (e) {
+        // Ignore storage restrictions
+      }
+    }
+
+    function saveEncounters() {
+      try { localStorage.setItem(STORAGE_KEY_ENCOUNTERS, JSON.stringify(state.encounters)); } catch (e) {}
+    }
+
+    function saveWeeklyReports() {
+      try { localStorage.setItem(STORAGE_KEY_WEEKLY, JSON.stringify(state.weeklyReports)); } catch (e) {}
+    }
+
+    function getWeekStart(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      const day = d.getDay();
+      const diff = (day === 0 ? -6 : 1 - day);
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function getWeekEnd(weekStartStr) {
+      const d = new Date(weekStartStr + 'T12:00:00');
+      d.setDate(d.getDate() + 6);
+      return d.toISOString().slice(0, 10);
+    }
+
+    function getWeeklySummaries(encountersList) {
+      const map = {};
+      encountersList.forEach(enc => {
+        const ws = getWeekStart(enc.date);
+        if (!map[ws]) map[ws] = { weekStart: ws, weekEnd: getWeekEnd(ws), visits: 0, expectedWrvu: 0 };
+        map[ws].visits += 1;
+        map[ws].expectedWrvu += enc.expectedWrvu;
+      });
+      return Object.values(map).map(w => {
+        const hosp = state.weeklyReports[w.weekStart] !== undefined && state.weeklyReports[w.weekStart] !== null && state.weeklyReports[w.weekStart] !== ''
+          ? Number(state.weeklyReports[w.weekStart])
+          : null;
+        return {
+          ...w,
+          expectedWrvu: Number(w.expectedWrvu.toFixed(2)),
+          hospitalWrvu: hosp,
+          status: computeStatus(w.expectedWrvu, hosp)
+        };
+      }).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+    }
+
+    function saveSettings() {
+      try { localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(state.settings)); } catch (e) {}
+    }
+
+    function saveCustomCodes() {
+      try {
+        const customs = state.catalog.filter(c => !DEFAULT_CPT_CATALOG.some(d => d.code === c.code));
+        localStorage.setItem(STORAGE_KEY_CUSTOM, JSON.stringify(customs));
+      } catch (e) {}
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      const colors = type === 'error'
+        ? 'bg-rose-600 text-white'
+        : type === 'success'
+        ? 'bg-teal-700 text-white'
+        : 'bg-slate-900 text-white';
+      el.className = `${colors} px-4 py-2.5 rounded-lg shadow-lg text-xs font-medium pointer-events-auto transition-opacity duration-300`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 2800);
+    }
+
+    function findCode(codeStr) {
+      return state.catalog.find(c => c.code.toUpperCase() === codeStr.toUpperCase());
+    }
+
+    function addCodeToDraft(codeStr) {
+      const item = findCode(codeStr);
+      if (!item) return;
+      const existing = state.draftItems.find(d => d.code === item.code);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        state.draftItems.push({
+          code: item.code,
+          desc: item.desc,
+          category: item.category,
+          unitWrvu: item.wrvu,
+          qty: 1,
+          mod25: false,
+          telehealth: false
+        });
+      }
+      renderDraft();
+    }
+
+    function renderQuickChips() {
+      const container = document.getElementById('quickChips');
+      container.innerHTML = '';
+      QUICK_CHIP_GROUPS.forEach(group => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'space-y-1';
+        const title = document.createElement('div');
+        title.className = 'text-[10px] font-semibold uppercase tracking-wider text-slate-400';
+        title.textContent = group.label;
+        const row = document.createElement('div');
+        row.className = 'flex flex-wrap gap-1.5';
+        group.codes.forEach(code => {
+          const item = findCode(code);
+          if (!item) return;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border transition ${group.badge}`;
+          btn.innerHTML = `<span class="font-semibold">${item.code}</span><span class="text-[11px] opacity-70 tabular-nums">${item.wrvu.toFixed(2)}</span>`;
+          btn.title = item.desc;
+          btn.addEventListener('click', () => addCodeToDraft(item.code));
+          row.appendChild(btn);
+        });
+        wrapper.appendChild(title);
+        wrapper.appendChild(row);
+        container.appendChild(wrapper);
+      });
+    }
+
+    function renderCodeSelect() {
+      const sel = document.getElementById('codeSearchSelect');
+      sel.innerHTML = '';
+      const groups = {};
+      state.catalog.forEach(c => {
+        if (!groups[c.category]) groups[c.category] = [];
+        groups[c.category].push(c);
+      });
+      Object.keys(groups).forEach(cat => {
+        const optGroup = document.createElement('optgroup');
+        optGroup.label = cat;
+        groups[cat].forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.code;
+          opt.textContent = `${c.code} (${c.wrvu.toFixed(2)}) — ${c.desc}`;
+          optGroup.appendChild(opt);
+        });
+        sel.appendChild(optGroup);
+      });
+    }
+
+    function renderDraft() {
+      const list = document.getElementById('draftList');
+      const totalBadge = document.getElementById('draftTotalBadge');
+      const total = state.draftItems.reduce((sum, d) => sum + d.unitWrvu * d.qty, 0);
+      totalBadge.textContent = `${total.toFixed(2)} wRVU`;
+
+      if (state.draftItems.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-400 py-2 text-center">No codes staged yet. Click a quick chip or select a code above.</p>';
+        return;
+      }
+
+      list.innerHTML = '';
+      state.draftItems.forEach((d, idx) => {
+        const row = document.createElement('div');
+        row.className = 'bg-white rounded-lg border border-slate-200 p-2.5 flex flex-wrap items-center justify-between gap-2';
+        row.innerHTML = `
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-bold text-slate-900">${d.code}</span>
+              <span class="text-xs text-teal-700 font-semibold tabular-nums">${(d.unitWrvu * d.qty).toFixed(2)} wRVU</span>
+            </div>
+            <p class="text-[11px] text-slate-500 truncate">${d.desc}</p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" data-action="mod25" data-idx="${idx}" class="px-1.5 py-0.5 rounded text-[11px] font-medium border ${d.mod25 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}">-25</button>
+            <button type="button" data-action="tele" data-idx="${idx}" class="px-1.5 py-0.5 rounded text-[11px] font-medium border ${d.telehealth ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}">TH</button>
+            <div class="inline-flex items-center border border-slate-200 rounded">
+              <button type="button" data-action="dec" data-idx="${idx}" class="px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-100">-</button>
+              <span class="px-1.5 text-xs font-semibold tabular-nums">${d.qty}</span>
+              <button type="button" data-action="inc" data-idx="${idx}" class="px-1.5 py-0.5 text-xs text-slate-600 hover:bg-slate-100">+</button>
+            </div>
+            <button type="button" data-action="remove" data-idx="${idx}" class="p-1 text-slate-400 hover:text-rose-600" title="Remove">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+      lucide.createIcons();
+    }
+
+    function computeStatus(expected, hospital) {
+      if (hospital === null || hospital === '' || Number.isNaN(Number(hospital))) return 'pending';
+      const diff = Number(hospital) - expected;
+      return Math.abs(diff) < 0.01 ? 'matched' : 'discrepancy';
+    }
+
+    function getFilteredEncounters() {
+      const { dateRange, status, search } = state.filters;
+      const now = new Date(TODAY_STR + 'T12:00:00');
+      return state.encounters.filter(enc => {
+        if (dateRange === 'today' && enc.date !== TODAY_STR) return false;
+        if (dateRange === 'week') {
+          const d = new Date(enc.date + 'T12:00:00');
+          const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+          if (diffDays > 7 || diffDays < -1) return false;
+        }
+        if (dateRange === 'month') {
+          if (enc.date.slice(0, 7) !== TODAY_STR.slice(0, 7)) return false;
+        }
+        if (status !== 'all') {
+          const ws = getWeekStart(enc.date);
+          const weekSummary = getWeeklySummaries(state.encounters).find(w => w.weekStart === ws);
+          if (!weekSummary || weekSummary.status !== status) return false;
+        }
+        if (search.trim()) {
+          const q = search.trim().toLowerCase();
+          const codeMatch = enc.items.some(i => i.code.toLowerCase().includes(q));
+          const noteMatch = (enc.note || '').toLowerCase().includes(q);
+          if (!codeMatch && !noteMatch) return false;
+        }
+        return true;
+      }).sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function renderKPIs(filtered) {
+      const totalWrvu = filtered.reduce((s, e) => s + e.expectedWrvu, 0);
+      const estComp = totalWrvu * state.settings.ratePerWrvu;
+      const annualPct = state.settings.annualTarget > 0 ? Math.min(100, (totalWrvu / state.settings.annualTarget) * 100) : 0;
+
+      document.getElementById('kpiTotalWrvu').textContent = totalWrvu.toFixed(2);
+      document.getElementById('kpiEstComp').textContent = `$${Math.round(estComp).toLocaleString()} est.`;
+      document.getElementById('kpiAnnualProgress').style.width = `${annualPct.toFixed(1)}%`;
+      document.getElementById('kpiAnnualLabel').textContent = `${annualPct.toFixed(1)}% of ${state.settings.annualTarget.toLocaleString()} annual target`;
+
+      const todayEnc = state.encounters.filter(e => e.date === TODAY_STR);
+      const todayWrvu = todayEnc.reduce((s, e) => s + e.expectedWrvu, 0);
+      const dailyPct = state.settings.dailyTarget > 0 ? Math.min(100, (todayWrvu / state.settings.dailyTarget) * 100) : 0;
+      document.getElementById('kpiTodayWrvu').textContent = todayWrvu.toFixed(2);
+      document.getElementById('kpiTodayVisits').textContent = `${todayEnc.length} visit${todayEnc.length === 1 ? '' : 's'}`;
+      document.getElementById('kpiDailyProgress').style.width = `${dailyPct.toFixed(1)}%`;
+      document.getElementById('kpiDailyLabel').textContent = `Target: ${state.settings.dailyTarget.toFixed(2)} wRVU/day`;
+
+      const avgWrvu = filtered.length > 0 ? totalWrvu / filtered.length : 0;
+      document.getElementById('kpiAvgWrvu').textContent = avgWrvu.toFixed(2);
+      document.getElementById('kpiTotalVisits').textContent = `${filtered.length} visit${filtered.length === 1 ? '' : 's'}`;
+
+      let estEmCount = 0;
+      let level4PlusCount = 0;
+      filtered.forEach(e => {
+        e.items.forEach(i => {
+          if (['99212', '99213', '99214', '99215'].includes(i.code)) {
+            estEmCount += i.qty;
+            if (['99214', '99215'].includes(i.code)) level4PlusCount += i.qty;
+          }
+        });
+      });
+      const l4Pct = estEmCount > 0 ? Math.round((level4PlusCount / estEmCount) * 100) : 0;
+      document.getElementById('kpiLevel4Rate').textContent = `99214+ share: ${l4Pct}% of est. E/M`;
+
+      const weeklyList = getWeeklySummaries(state.encounters);
+      const auditedWeeks = weeklyList.filter(w => w.hospitalWrvu !== null);
+      const variance = auditedWeeks.reduce((s, w) => s + (w.hospitalWrvu - w.expectedWrvu), 0);
+      const flagged = weeklyList.filter(w => w.status === 'discrepancy').length;
+      const varEl = document.getElementById('kpiVariance');
+      varEl.textContent = (variance > 0 ? '+' : '') + variance.toFixed(2);
+      varEl.className = `text-2xl font-bold tabular-nums ${variance < -0.01 ? 'text-rose-600' : variance > 0.01 ? 'text-amber-600' : 'text-slate-900'}`;
+      const badgeEl = document.getElementById('kpiDiscrepancyCount');
+      badgeEl.textContent = `${flagged} wk${flagged === 1 ? '' : 's'} flagged`;
+      badgeEl.className = `text-xs font-medium px-2 py-0.5 rounded-full ${flagged > 0 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-slate-100 text-slate-600'}`;
+      document.getElementById('kpiVarianceNote').textContent = auditedWeeks.length > 0
+        ? `${auditedWeeks.length} of ${weeklyList.length} week${weeklyList.length === 1 ? '' : 's'} reconciled`
+        : 'Enter weekly health system wRVUs to audit';
+    }
+
+    function renderWeeklyAudit() {
+      const weeklyList = getWeeklySummaries(state.encounters);
+      const tbody = document.getElementById('weeklyAuditBody');
+      const emptyEl = document.getElementById('emptyWeeklyState');
+      tbody.innerHTML = '';
+
+      if (weeklyList.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      emptyEl.classList.add('hidden');
+
+      weeklyList.forEach(w => {
+        const tr = document.createElement('tr');
+        tr.className = w.status === 'discrepancy' ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50';
+        const hasHosp = w.hospitalWrvu !== null;
+        const variance = hasHosp ? (w.hospitalWrvu - w.expectedWrvu) : null;
+        const varText = variance === null ? '—' : `${variance > 0 ? '+' : ''}${variance.toFixed(2)}`;
+        const varColor = variance === null ? 'text-slate-400' : Math.abs(variance) < 0.01 ? 'text-teal-700 font-semibold' : 'text-rose-600 font-semibold';
+
+        const statusBadge = w.status === 'matched'
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-teal-50 text-teal-700 border border-teal-200">Matched</span>'
+          : w.status === 'discrepancy'
+          ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">Discrepancy</span>'
+          : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">Pending</span>';
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 whitespace-nowrap">
+            <div class="text-xs font-semibold text-slate-900 tabular-nums">${w.weekStart} to ${w.weekEnd}</div>
+          </td>
+          <td class="py-2.5 px-3 text-right text-xs text-slate-600 tabular-nums">${w.visits}</td>
+          <td class="py-2.5 px-3 text-right font-semibold text-slate-900 tabular-nums">${w.expectedWrvu.toFixed(2)}</td>
+          <td class="py-2.5 px-3 text-right">
+            <input type="number" step="0.01" min="0" data-week-start="${w.weekStart}" value="${hasHosp ? w.hospitalWrvu.toFixed(2) : ''}" placeholder="Enter total" class="weekly-hosp-input w-24 text-right rounded border border-slate-300 px-2 py-1 text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white" />
+          </td>
+          <td class="py-2.5 px-3 text-right text-xs tabular-nums ${varColor}">${varText}</td>
+          <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderEncounterTable() {
+      renderWeeklyAudit();
+      const filtered = getFilteredEncounters();
+      renderKPIs(filtered);
+
+      document.getElementById('encounterCountBadge').textContent = `${filtered.length} visit${filtered.length === 1 ? '' : 's'}`;
+      const tbody = document.getElementById('encounterTableBody');
+      const emptyEl = document.getElementById('emptyLogState');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      emptyEl.classList.add('hidden');
+
+      filtered.forEach(enc => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+
+        const codesHtml = enc.items.map(i => {
+          const mods = [];
+          if (i.mod25) mods.push('25');
+          if (i.telehealth) mods.push('TH');
+          const modStr = mods.length ? `-${mods.join(',')}` : '';
+          const qtyStr = i.qty > 1 ? `×${i.qty}` : '';
+          return `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200 mr-1 mb-1">${i.code}${modStr}${qtyStr}</span>`;
+        }).join('');
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 align-top whitespace-nowrap">
+            <div class="text-xs font-semibold text-slate-900 tabular-nums">${enc.date}</div>
+            <div class="text-[11px] text-slate-500 max-w-[160px] truncate" title="${(enc.note || '').replace(/"/g, '&quot;')}">${enc.note || 'Clinic visit'}</div>
+          </td>
+          <td class="py-2.5 px-3 align-top">${codesHtml}</td>
+          <td class="py-2.5 px-3 align-top text-right font-semibold text-slate-900 tabular-nums">${enc.expectedWrvu.toFixed(2)}</td>
+          <td class="py-2.5 px-3 align-top text-right">
+            <button type="button" data-del-id="${enc.id}" class="del-enc-btn p-1 text-slate-400 hover:text-rose-600" title="Delete encounter">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    function renderAnalytics() {
+      const filtered = getFilteredEncounters();
+      const byDate = {};
+      const byCategory = {};
+      let g2211Count = 0;
+      let eligibleEmCount = 0;
+
+      filtered.forEach(e => {
+        byDate[e.date] = (byDate[e.date] || 0) + e.expectedWrvu;
+        let hasOfficeEm = false;
+        let hasG2211 = false;
+        e.items.forEach(i => {
+          const cat = i.category || 'Other';
+          byCategory[cat] = (byCategory[cat] || 0) + i.unitWrvu * i.qty;
+          if (/^992(0[2-5]|1[1-5])$/.test(i.code)) hasOfficeEm = true;
+          if (i.code === 'G2211') hasG2211 = true;
+        });
+        if (hasOfficeEm) {
+          eligibleEmCount += 1;
+          if (hasG2211) g2211Count += 1;
+        }
+      });
+
+      const sortedDates = Object.keys(byDate).sort();
+      const dailyValues = sortedDates.map(d => Number(byDate[d].toFixed(2)));
+      const targetLine = sortedDates.map(() => state.settings.dailyTarget);
+
+      if (dailyChartInstance) dailyChartInstance.destroy();
+      dailyChartInstance = new Chart(document.getElementById('dailyChart'), {
+        type: 'bar',
+        data: {
+          labels: sortedDates.length ? sortedDates : ['No Data'],
+          datasets: [
+            {
+              label: 'CMS wRVUs',
+              data: dailyValues.length ? dailyValues : [0],
+              backgroundColor: '#0d9488',
+              borderRadius: 6
+            },
+            {
+              label: 'Daily Target',
+              data: targetLine.length ? targetLine : [state.settings.dailyTarget],
+              type: 'line',
+              borderColor: '#6366f1',
+              borderDash: [5, 5],
+              pointRadius: 0,
+              borderWidth: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      const catLabels = Object.keys(byCategory);
+      const catValues = catLabels.map(k => Number(byCategory[k].toFixed(2)));
+      if (categoryChartInstance) categoryChartInstance.destroy();
+      categoryChartInstance = new Chart(document.getElementById('categoryChart'), {
+        type: 'doughnut',
+        data: {
+          labels: catLabels.length ? catLabels : ['No Logged Visits'],
+          datasets: [{
+            data: catValues.length ? catValues : [1],
+            backgroundColor: catLabels.length
+              ? ['#0d9488', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#64748b']
+              : ['#e2e8f0']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+
+      const g2211Rate = eligibleEmCount > 0 ? Math.round((g2211Count / eligibleEmCount) * 100) : 0;
+      const weeklyList = getWeeklySummaries(state.encounters);
+      const totalDiscrepancies = weeklyList.filter(w => w.status === 'discrepancy').length;
+      const missingWrvu = weeklyList.reduce((s, w) => {
+        if (w.hospitalWrvu !== null && w.hospitalWrvu < w.expectedWrvu) return s + (w.expectedWrvu - w.hospitalWrvu);
+        return s;
+      }, 0);
+
+      document.getElementById('analyticsInsights').innerHTML = `
+        <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">G2211 Capture Rate</p>
+          <p class="text-xl font-bold text-slate-900 mt-1 tabular-nums">${g2211Rate}%</p>
+          <p class="text-xs text-slate-500 mt-1">${g2211Count} of ${eligibleEmCount} office E/M visits (+0.33 wRVU each)</p>
+        </div>
+        <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">Uncredited System wRVUs</p>
+          <p class="text-xl font-bold text-rose-600 mt-1 tabular-nums">${missingWrvu.toFixed(2)}</p>
+          <p class="text-xs text-slate-500 mt-1">${totalDiscrepancies} week${totalDiscrepancies === 1 ? '' : 's'} with system discrepancy ($${Math.round(missingWrvu * state.settings.ratePerWrvu).toLocaleString()} impact)</p>
+        </div>
+        <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">Projected Annualized Pace</p>
+          <p class="text-xl font-bold text-teal-700 mt-1 tabular-nums">${sortedDates.length ? Math.round((filtered.reduce((s, e) => s + e.expectedWrvu, 0) / sortedDates.length) * 220).toLocaleString() : 0}</p>
+          <p class="text-xs text-slate-500 mt-1">Based on 220 clinical workdays/yr at current avg</p>
+        </div>
+      `;
+    }
+
+    function renderReference() {
+      document.getElementById('refCountBadge').textContent = state.catalog.length;
+      const cats = ['All', ...new Set(state.catalog.map(c => c.category))];
+      const pillsEl = document.getElementById('refCategoryPills');
+      pillsEl.innerHTML = '';
+      cats.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const active = state.refFilter.category === cat;
+        btn.className = `px-3 py-1 rounded-full text-xs font-medium border transition ${active ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`;
+        btn.textContent = cat;
+        btn.addEventListener('click', () => {
+          state.refFilter.category = cat;
+          renderReference();
+        });
+        pillsEl.appendChild(btn);
+      });
+
+      const q = state.refFilter.search.trim().toLowerCase();
+      const rows = state.catalog.filter(c => {
+        if (state.refFilter.category !== 'All' && c.category !== state.refFilter.category) return false;
+        if (q) {
+          return c.code.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q) || (c.req || '').toLowerCase().includes(q);
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById('refTableBody');
+      tbody.innerHTML = '';
+      rows.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">${c.code}</td>
+          <td class="py-2.5 px-3 whitespace-nowrap"><span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">${c.category}</span></td>
+          <td class="py-2.5 px-3 text-slate-800">${c.desc}</td>
+          <td class="py-2.5 px-3 text-right font-semibold text-teal-700 tabular-nums">${c.wrvu.toFixed(2)}</td>
+          <td class="py-2.5 px-3 text-xs text-slate-600">${c.req || '—'}</td>
+          <td class="py-2.5 px-3 text-right">
+            <button type="button" data-ref-add="${c.code}" class="px-2.5 py-1 rounded-md text-xs font-medium bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200">+ Stage</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      ['tracker', 'analytics', 'reference'].forEach(t => {
+        document.getElementById(`view-${t}`).classList.toggle('hidden', t !== tabName);
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const isActive = btn.dataset.tab === tabName;
+        btn.className = `tab-btn px-4 py-2.5 text-sm border-b-2 whitespace-nowrap ${isActive ? 'font-semibold border-teal-600 text-teal-700' : 'font-medium border-transparent text-slate-600 hover:text-slate-900'}`;
+      });
+      if (tabName === 'analytics') renderAnalytics();
+      if (tabName === 'reference') renderReference();
+    }
+
+    function loadSampleDay() {
+      const d1 = TODAY_STR;
+      const ws = getWeekStart(d1);
+      const samples = [
+        { codes: ['99214', 'G2211'], note: 'HTN + T2DM med titration' },
+        { codes: ['G0439', '99214', 'G2211'], note: 'Medicare AWV + knee OA (Mod 25)' },
+        { codes: ['99496'], note: 'TCM 7-day post-CHF discharge' },
+        { codes: ['99214', '99406', 'G2211'], note: 'COPD f/u + tobacco cessation' },
+        { codes: ['99396', '90471'], note: 'Annual physical (40-64) + flu vax' },
+        { codes: ['99213', '69210'], note: 'Ear pain + cerumen removal' }
+      ];
+      let addedSum = 0;
+      samples.forEach((s, idx) => {
+        const items = s.codes.map(code => {
+          const c = findCode(code);
+          return { code: c.code, desc: c.desc, category: c.category, unitWrvu: c.wrvu, qty: 1, mod25: (s.codes.includes('G0439') && c.code === '99214'), telehealth: false };
+        });
+        const expectedWrvu = Number(items.reduce((sum, i) => sum + i.unitWrvu * i.qty, 0).toFixed(2));
+        addedSum += expectedWrvu;
+        state.encounters.unshift({
+          id: `sample_${Date.now()}_${idx}`,
+          date: d1,
+          note: s.note,
+          items,
+          expectedWrvu
+        });
+      });
+      // Simulate hospital report missing G2211 (0.33) + 69210 (0.59) = -0.92 wRVU
+      state.weeklyReports[ws] = Number((addedSum - 0.92).toFixed(2));
+      saveEncounters();
+      saveWeeklyReports();
+      renderEncounterTable();
+      if (state.activeTab === 'analytics') renderAnalytics();
+      showToast('Loaded 6 sample visits with a -0.92 weekly system discrepancy', 'success');
+    }
+
+    function exportCsv() {
+      const rows = [['Date', 'Note', 'Codes', 'CMS_Expected_wRVU', 'Week_Start']];
+      getFilteredEncounters().forEach(e => {
+        const codeList = e.items.map(i => `${i.code}${i.mod25 ? '-25' : ''}${i.qty > 1 ? 'x' + i.qty : ''}`).join('+');
+        rows.push([e.date, `"${(e.note || '').replace(/"/g, '""')}"`, codeList, e.expectedWrvu.toFixed(2), getWeekStart(e.date)]);
+      });
+      rows.push([]);
+      rows.push(['Week_Start', 'Week_End', 'Visits', 'CMS_Weekly_wRVU', 'System_Weekly_wRVU', 'Weekly_Variance', 'Audit_Status']);
+      getWeeklySummaries(state.encounters).forEach(w => {
+        const hosp = w.hospitalWrvu !== null ? w.hospitalWrvu.toFixed(2) : '';
+        const variance = w.hospitalWrvu !== null ? (w.hospitalWrvu - w.expectedWrvu).toFixed(2) : '';
+        rows.push([w.weekStart, w.weekEnd, w.visits, w.expectedWrvu.toFixed(2), hosp, variance, w.status]);
+      });
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `primary_care_wrvu_log_${TODAY_STR}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('Exported CSV log', 'success');
+    }
+
+    function importCsvRows(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      let imported = 0;
+      lines.forEach((line, idx) => {
+        if (idx === 0 && line.toLowerCase().startsWith('date,')) return;
+        const parts = line.split(',');
+        if (parts.length < 2) return;
+        const date = parts[0].trim() || TODAY_STR;
+        const codeTokens = parts[1].split(/[+;|\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+        const note = parts.slice(2).join(',').replace(/^"|"$/g, '').trim();
+
+        const items = [];
+        codeTokens.forEach(tok => {
+          const cleanCode = tok.replace(/-25$/, '');
+          const found = findCode(cleanCode);
+          if (found) {
+            items.push({
+              code: found.code,
+              desc: found.desc,
+              category: found.category,
+              unitWrvu: found.wrvu,
+              qty: 1,
+              mod25: tok.includes('-25'),
+              telehealth: false
+            });
+          }
+        });
+        if (items.length === 0) return;
+        const expectedWrvu = Number(items.reduce((s, i) => s + i.unitWrvu * i.qty, 0).toFixed(2));
+        state.encounters.unshift({
+          id: `imp_${Date.now()}_${idx}`,
+          date,
+          note: note || 'Imported visit',
+          items,
+          expectedWrvu
+        });
+        imported += 1;
+      });
+      if (imported > 0) {
+        saveEncounters();
+        renderEncounterTable();
+        if (state.activeTab === 'analytics') renderAnalytics();
+        showToast(`Imported ${imported} encounter${imported === 1 ? '' : 's'}`, 'success');
+      } else {
+        showToast('No valid CPT rows found in CSV', 'error');
+      }
+    }
+
+    // Event Wiring
+    document.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      document.getElementById('inputDate').value = TODAY_STR;
+      renderQuickChips();
+      renderCodeSelect();
+      renderDraft();
+      renderEncounterTable();
+      renderReference();
+      lucide.createIcons();
+
+      // Tabs
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      });
+
+      // Add selected code
+      document.getElementById('btnAddSelectedCode').addEventListener('click', () => {
+        const code = document.getElementById('codeSearchSelect').value;
+        if (code) addCodeToDraft(code);
+      });
+
+      // Draft item actions
+      document.getElementById('draftList').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const idx = Number(btn.dataset.idx);
+        const action = btn.dataset.action;
+        const item = state.draftItems[idx];
+        if (!item) return;
+        if (action === 'mod25') item.mod25 = !item.mod25;
+        if (action === 'tele') item.telehealth = !item.telehealth;
+        if (action === 'inc') item.qty += 1;
+        if (action === 'dec') {
+          if (item.qty > 1) item.qty -= 1;
+          else state.draftItems.splice(idx, 1);
+        }
+        if (action === 'remove') state.draftItems.splice(idx, 1);
+        renderDraft();
+      });
+
+      // Log Encounter
+      document.getElementById('btnLogEncounter').addEventListener('click', () => {
+        if (state.draftItems.length === 0) {
+          showToast('Stage at least one CPT code first', 'error');
+          return;
+        }
+        const date = document.getElementById('inputDate').value || TODAY_STR;
+        const note = document.getElementById('inputNote').value.trim();
+        const expectedWrvu = Number(state.draftItems.reduce((s, d) => s + d.unitWrvu * d.qty, 0).toFixed(2));
+
+        state.encounters.unshift({
+          id: `enc_${Date.now()}`,
+          date,
+          note,
+          items: state.draftItems.map(d => ({ ...d })),
+          expectedWrvu
+        });
+        state.draftItems = [];
+        document.getElementById('inputNote').value = '';
+        saveEncounters();
+        renderDraft();
+        renderEncounterTable();
+        showToast(`Logged ${expectedWrvu.toFixed(2)} wRVUs`, 'success');
+      });
+
+      // Inline weekly hospital wRVU edit
+      document.getElementById('weeklyAuditBody').addEventListener('change', (e) => {
+        if (!e.target.classList.contains('weekly-hosp-input')) return;
+        const ws = e.target.dataset.weekStart;
+        const val = e.target.value.trim();
+        if (val !== '' && !Number.isNaN(Number(val))) {
+          state.weeklyReports[ws] = Number(val);
+        } else {
+          delete state.weeklyReports[ws];
+        }
+        saveWeeklyReports();
+        renderEncounterTable();
+        if (state.activeTab === 'analytics') renderAnalytics();
+      });
+
+      document.getElementById('encounterTableBody').addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.del-enc-btn');
+        if (!delBtn) return;
+        const id = delBtn.dataset.delId;
+        state.encounters = state.encounters.filter(x => x.id !== id);
+        saveEncounters();
+        renderEncounterTable();
+        if (state.activeTab === 'analytics') renderAnalytics();
+        showToast('Encounter removed');
+      });
+
+      // Filters
+      document.getElementById('filterRange').addEventListener('change', (e) => {
+        state.filters.dateRange = e.target.value;
+        renderEncounterTable();
+        if (state.activeTab === 'analytics') renderAnalytics();
+      });
+      document.getElementById('filterStatus').addEventListener('change', (e) => {
+        state.filters.status = e.target.value;
+        renderEncounterTable();
+      });
+      document.getElementById('filterSearch').addEventListener('input', (e) => {
+        state.filters.search = e.target.value;
+        renderEncounterTable();
+      });
+
+      // Reference search & add
+      document.getElementById('refSearch').addEventListener('input', (e) => {
+        state.refFilter.search = e.target.value;
+        renderReference();
+      });
+      document.getElementById('refTableBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-ref-add]');
+        if (!btn) return;
+        addCodeToDraft(btn.dataset.refAdd);
+        showToast(`Staged ${btn.dataset.refAdd} to Encounter Builder`, 'success');
+      });
+
+      // Sample & Clear
+      document.getElementById('btnLoadSample').addEventListener('click', loadSampleDay);
+      document.getElementById('btnClearAll').addEventListener('click', () => {
+        document.getElementById('modalConfirmClear').classList.replace('hidden', 'flex');
+      });
+      document.getElementById('btnConfirmClear').addEventListener('click', () => {
+        state.encounters = [];
+        state.weeklyReports = {};
+        saveEncounters();
+        saveWeeklyReports();
+        renderEncounterTable();
+        if (state.activeTab === 'analytics') renderAnalytics();
+        document.getElementById('modalConfirmClear').classList.replace('flex', 'hidden');
+        showToast('Encounter log cleared');
+      });
+
+      // Export & Import
+      document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
+      document.getElementById('btnOpenImport').addEventListener('click', () => {
+        document.getElementById('modalImport').classList.replace('hidden', 'flex');
+      });
+      document.getElementById('importFileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => { document.getElementById('importCsvText').value = ev.target.result; };
+        reader.readAsText(file);
+      });
+      document.getElementById('btnRunImport').addEventListener('click', () => {
+        const txt = document.getElementById('importCsvText').value;
+        importCsvRows(txt);
+        document.getElementById('modalImport').classList.replace('flex', 'hidden');
+      });
+
+      // Settings Modal
+      document.getElementById('btnOpenSettings').addEventListener('click', () => {
+        document.getElementById('settingRate').value = state.settings.ratePerWrvu;
+        document.getElementById('settingDailyTarget').value = state.settings.dailyTarget;
+        document.getElementById('settingAnnualTarget').value = state.settings.annualTarget;
+        document.getElementById('modalSettings').classList.replace('hidden', 'flex');
+      });
+      document.getElementById('btnSaveSettings').addEventListener('click', () => {
+        state.settings.ratePerWrvu = Math.max(0, Number(document.getElementById('settingRate').value) || 0);
+        state.settings.dailyTarget = Math.max(1, Number(document.getElementById('settingDailyTarget').value) || 22);
+        state.settings.annualTarget = Math.max(100, Number(document.getElementById('settingAnnualTarget').value) || 4800);
+        saveSettings();
+        renderEncounterTable();
+        if (state.activeTab === 'analytics') renderAnalytics();
+        document.getElementById('modalSettings').classList.replace('flex', 'hidden');
+        showToast('Targets & rate updated', 'success');
+      });
+
+      // Custom Code Modal
+      document.getElementById('btnOpenCustomCode').addEventListener('click', () => {
+        document.getElementById('modalCustomCode').classList.replace('hidden', 'flex');
+      });
+      document.getElementById('btnSaveCustomCode').addEventListener('click', () => {
+        const code = document.getElementById('customCodeId').value.trim().toUpperCase();
+        const wrvu = Number(document.getElementById('customCodeWrvu').value);
+        const desc = document.getElementById('customCodeDesc').value.trim();
+        const category = document.getElementById('customCodeCat').value;
+        if (!code || Number.isNaN(wrvu) || wrvu < 0) {
+          showToast('Enter a valid CPT code and wRVU value', 'error');
+          return;
+        }
+        if (findCode(code)) {
+          showToast(`Code ${code} already exists`, 'error');
+          return;
+        }
+        state.catalog.push({ code, category, desc: desc || 'Custom code', wrvu, req: 'Custom user-added code' });
+        saveCustomCodes();
+        renderCodeSelect();
+        renderReference();
+        document.getElementById('customCodeId').value = '';
+        document.getElementById('customCodeWrvu').value = '';
+        document.getElementById('customCodeDesc').value = '';
+        document.getElementById('modalCustomCode').classList.replace('flex', 'hidden');
+        showToast(`Added ${code} (${wrvu.toFixed(2)} wRVU)`, 'success');
+      });
+
+      // Close Modals
+      document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+          btn.closest('.fixed').classList.replace('flex', 'hidden');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
